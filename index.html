@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Neo Chat</title>
+
+  <!--
+    BLOCO CRÍTICO DE CONEXÃO: Tenta carregar a biblioteca via CDN.
+    Este é o ponto onde o navegador falha, mas é a forma mais recomendada.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/@google/genai@0.15.0/umd/index.js"></script>
+
+  <!-- Estilos CSS embutidos (Mantidos iguais) -->
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', Arial, Helvetica, sans-serif;
+      /* O fundo depende de um arquivo local, por favor, remova se for subir para o GitHub Pages sem a pasta 'assets' */
+      background: url('assets/fundochatbot.png') no-repeat center center;
+      background-size: cover;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #fff;
+    }
+
+    .chat-container {
+      width: 600px;
+      height: 80vh;
+      max-width: 95%;
+      background: rgba(124, 59, 255, 0.3);
+      border-radius: 25px;
+      backdrop-filter: blur(5px);
+      box-shadow: 0 0 35px rgba(124, 59, 255, 0.5);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #chat-box {
+      padding: 25px;
+      flex-grow: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      padding: 14px 20px;
+      border-radius: 20px;
+      max-width: 70%;
+      word-wrap: break-word;
+      font-size: 1rem;
+      line-height: 1.4rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .neo {
+      background: #1e053a;
+      align-self: flex-end; /* Neo à direita */
+      color: #fff;
+    }
+
+    .user {
+      background: #be43ff;
+      align-self: flex-start; /* Usuário à esquerda */
+      color: #fff;
+    }
+
+    #chat-form {
+      display: flex;
+      padding: 20px;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.1);
+    }
+
+    #user-input {
+      flex-grow: 1;
+      padding: 14px 20px;
+      border-radius: 25px;
+      border: none;
+      outline: none;
+      font-family: 'Inter', Arial, Helvetica, sans-serif;
+      font-size: 1rem;
+      background: rgba(255,255,255,0.15);
+      color: #fff;
+    }
+
+    #user-input::placeholder {
+      color: #eee;
+    }
+
+    #chat-form button {
+      margin-left: 12px;
+      padding: 14px 24px;
+      background: #7c3bff;
+      border: none;
+      border-radius: 25px;
+      font-weight: 700;
+      color: #fff;
+      cursor: pointer;
+      transition: 0.3s ease;
+      font-size: 1rem;
+    }
+
+    #chat-form button:hover {
+      background: linear-gradient(90deg, #7c3bff, #b26fff);
+      transform: scale(1.05);
+    }
+
+    /* Neo digitando */
+    .typing-indicator {
+      padding: 8px 15px;
+      font-style: italic;
+      color: #ddd;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div id="chat-box">
+      <!-- Mensagens aparecerão aqui -->
+    </div>
+
+    <div class="typing-indicator" id="typing-indicator">
+      Neo está digitando...
+    </div>
+
+    <!-- O formulário está aqui -->
+    <form id="chat-form">
+      <input type="text" id="user-input" placeholder="Escreva aqui..." autocomplete="off">
+      <button type="submit">Enviar</button>
+    </form>
+  </div>
+
+  <!-- 2. Script principal do Chatbot -->
+  <script>
+    
+    // ===================================
+    // ===== CONFIGURAÇÃO DA SUA GEM =====
+    // ===================================
+
+    // 🚀 Sua CHAVE DE API (confirmada):
+    const API_KEY = "AIzaSyDLYah1waCl3hpe4Wgz_7lHHw7zFkKy6_I"; 
+
+    // 🛑 MODEL ID: Use o ID real da sua Gem, confirmado como 'Teste - ChatBot'
+    const MODEL_NAME = "Teste - ChatBot"; 
+    
+    // ===================================
+    // ====== ELEMENTOS DA INTERFACE ======
+    // ===================================
+    const chatBox = document.getElementById("chat-box");
+    const typingIndicator = document.getElementById("typing-indicator");
+    const form = document.getElementById("chat-form");
+    const userInput = document.getElementById("user-input");
+    const sendButton = form ? form.querySelector('button[type="submit"]') : null;
+
+    let model = null; // Inicializa o modelo como nulo
+
+    // Função auxiliar para desabilitar a entrada durante a carga/erros
+    function disableInput(disabled) {
+        if (userInput) userInput.disabled = disabled;
+        if (sendButton) sendButton.disabled = disabled;
+        if (typingIndicator) typingIndicator.style.display = "none";
+    }
+
+    // ===== FUNÇÃO PRA ADICIONAR MENSAGEM NO CHAT (DEVE SER GLOBAL) =====
+    function addMessage(text, sender) {
+        if (!chatBox) {
+            console.error("ERRO: chatBox não está disponível.");
+            return;
+        }
+        const msg = document.createElement("div");
+        msg.classList.add("message", sender);
+        // Garante que a saída não contenha formatação Markdown e mantém quebras de linha
+        msg.innerHTML = text.replace(/[\*\_\#]/g, '').replace(/\n/g, '<br>'); 
+        chatBox.appendChild(msg);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // ===== FUNÇÃO PARA PEGAR O TEXTO DA RESPOSTA (DEVE SER GLOBAL) =====
+    function extractText(response) {
+        try {
+            if (response && response.text) return response.text; 
+            return "⚠️ Neo não conseguiu gerar uma resposta.";
+        } catch (e) {
+            return "⚠️ Erro ao processar resposta.";
+        }
+    }
+
+    // A MÁGICA FINAL: Inicializar a API e os Eventos APENAS DEPOIS QUE O WINDOW CARREGAR
+    window.addEventListener('load', () => {
+        disableInput(true); // Desabilita até a inicialização
+        
+        // Tenta inicializar a API DENTRO DO try-catch
+        try {
+            // AQUI ESTÁ O CHECK MAIS IMPORTANTE:
+            // Verificamos se o script carregado pelo CDN definiu a classe.
+            if (typeof GoogleGenerativeAI === 'undefined') {
+                throw new Error("GoogleGenerativeAI não foi carregada pelo CDN.");
+            }
+
+            const genAI = new GoogleGenerativeAI(API_KEY);
+            // Cria o modelo de chat usando o ID da sua Gem
+            model = genAI.getGenerativeModel({ model: MODEL_NAME });
+
+            // Se chegou até aqui, o SDK carregou e o modelo foi criado!
+            disableInput(false); // Habilita a entrada
+            addMessage("Olá! Sou o **Teste - ChatBot**. A conexão foi estabelecida com sucesso. Pergunte-me algo da sua base de conhecimento. 💬", "neo");
+        } catch (e) {
+            console.error("ERRO CRÍTICO NA INICIALIZAÇÃO DA API:", e);
+            
+            // Tratamento de erro específico para a falha do CDN
+            if (e.message.includes("GoogleGenerativeAI não foi carregada")) {
+                addMessage("⚠️ **ERRO CRÍTICO DE CONEXÃO (CDN):** A biblioteca do Gemini não carregou. Se você está vendo isso em um domínio real (GitHub Pages/Netlify), verifique sua chave de API e ID da Gem.", "neo");
+            } else {
+                addMessage("⚠️ Falha ao criar o modelo da API. Verifique se a chave de API está correta ou se o ID da Gem é válido.", "neo");
+            }
+            // Deixa desabilitado se houver erro
+            disableInput(true); 
+            return;
+        }
+
+        // 4. Configura o Evento de Envio
+        if (form) {
+            form.addEventListener("submit", async (e) => {
+                e.preventDefault();
+
+                if (!model) {
+                    addMessage("❌ O chat está inativo.", "neo");
+                    return;
+                }
+
+                const msg = userInput.value.trim();
+                if (msg === "") return;
+
+                // Adiciona mensagem do usuário
+                addMessage(msg, "user");
+                userInput.value = ""; 
+
+                // Mostra indicador de digitação e desabilita entrada
+                typingIndicator.style.display = "block";
+                disableInput(true);
+                
+                chatBox.scrollTop = chatBox.scrollHeight; 
+
+                try {
+                    // Simula um pequeno atraso para UX
+                    await new Promise(res => setTimeout(res, 500)); 
+                    
+                    // CHAMADA PARA SUA GEM
+                    const response = await model.generateContent(msg);
+                    const botText = extractText(response);
+
+                    // Adiciona resposta do Neo
+                    addMessage(botText, "neo");
+
+                } catch (err) {
+                    console.error("ERRO CRÍTICO NA REQUISIÇÃO À API:", err);
+                    addMessage("⚠️ Erro de comunicação com a API. Verifique o console para mais detalhes.", "neo");
+                }
+
+                // Habilita entrada e garante rolagem para o final
+                disableInput(false); 
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+        }
+    });
+
+  </script>
+</body>
+</html>
