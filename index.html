@@ -7,9 +7,9 @@
 
   <!--
     BLOCO CRÍTICO DE CONEXÃO: Tenta carregar a biblioteca via CDN.
-    Este é o ponto onde o navegador falha, mas é a forma mais recomendada.
+    MUDANÇA CRÍTICA: Trocando de CDN para tentar resolver a falha de carregamento persistente.
   -->
-  <script src="https://cdn.jsdelivr.net/npm/@google/genai@0.15.0/umd/index.js"></script>
+  <script src="https://unpkg.com/@google/genai@0.15.0/umd/index.js"></script>
 
   <!-- Estilos CSS embutidos (Mantidos iguais) -->
   <style>
