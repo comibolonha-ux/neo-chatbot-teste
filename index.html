@@ -19,8 +19,12 @@
       margin: 0;
       padding: 0;
       font-family: 'Inter', Arial, Helvetica, sans-serif;
-      /* O fundo depende de um arquivo local, por favor, remova se for subir para o GitHub Pages sem a pasta 'assets' */
-      background: url('assets/fundochatbot.png') no-repeat center center;
+      /*
+        ATENÇÃO: Este background falhou (404).
+        REMOVIDO: background: url('assets/fundochatbot.png') no-repeat center center;
+        O background será a cor sólida padrão do navegador/div principal.
+      */
+      background: #10031d; /* Fundo escuro simples */
       background-size: cover;
       display: flex;
       justify-content: center;
@@ -218,7 +222,7 @@
             
             // Tratamento de erro específico para a falha do CDN
             if (e.message.includes("GoogleGenerativeAI não foi carregada")) {
-                addMessage("⚠️ **ERRO CRÍTICO DE CONEXÃO (CDN):** A biblioteca do Gemini não carregou. Se você está vendo isso em um domínio real (GitHub Pages/Netlify), verifique sua chave de API e ID da Gem.", "neo");
+                addMessage("⚠️ **ERRO CRÍTICO DE CONEXÃO (CDN):** A biblioteca do Gemini não carregou. Se você está vendo isso em um domínio real (GitHub Pages/Netlify), verifique sua chave de API e ID da Gem. Tente recarregar a página.", "neo");
             } else {
                 addMessage("⚠️ Falha ao criar o modelo da API. Verifique se a chave de API está correta ou se o ID da Gem é válido.", "neo");
             }
